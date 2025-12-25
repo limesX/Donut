@@ -1139,6 +1139,17 @@ std::shared_ptr<SceneGraph> SceneTypeFactory::CreateGraph()
 	return std::make_shared<SceneGraph>();
 }
 
+void SceneGraph::ReplaceMaterial(std::shared_ptr<MeshGeometry> geometry, std::shared_ptr<Material> material)
+{
+    if (m_Materials.Release(geometry->material) && OnMaterialRemoved)
+        OnMaterialRemoved(geometry->material);
+    
+    geometry->material = material;
+    
+    if (m_Materials.AddRef(geometry->material) && OnMaterialAdded)
+        OnMaterialAdded(geometry->material);
+}
+
 std::shared_ptr<SceneGraphLeaf> SceneTypeFactory::CreateLeaf(const std::string& type)
 {
     if (type == "DirectionalLight")
