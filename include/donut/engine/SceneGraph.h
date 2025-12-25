@@ -580,6 +580,8 @@ namespace donut::engine
         [[nodiscard]] std::shared_ptr<SceneGraphNode> FindNode(const std::filesystem::path& path, SceneGraphNode* context = nullptr) const;
         
         void Refresh(uint32_t frameIndex);
+
+        virtual void ReplaceMaterial(std::shared_ptr<MeshGeometry> geometry, std::shared_ptr<Material> material);
     };
 
     struct SceneImportResult

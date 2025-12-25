@@ -1686,6 +1686,16 @@ bool GltfImporter::Load(
             point->intensity = src->intensity;
             point->color = src->color;
             point->range = src->range;
+            if (src->extras.data)
+            {
+                const char* radius = strstr(src->extras.data, "\"radius\"");
+                if (radius)
+                    sscanf(radius, "\"radius\"%*[^0-9.%] %f", &point->radius);
+                
+                const char* shadowChannel = strstr(src->extras.data, "\"shadowChannel\"");
+                if (shadowChannel)
+                    sscanf(shadowChannel, "\"shadowChannel\"%*[^0-9] %d", &point->shadowChannel);
+            }
             dst = point;
             break;
         }
@@ -1696,6 +1706,16 @@ bool GltfImporter::Load(
             spot->range = src->range;
             spot->innerAngle = dm::degrees(src->spot_inner_cone_angle);
             spot->outerAngle = dm::degrees(src->spot_outer_cone_angle);
+            if (src->extras.data)
+            {
+                const char* radius = strstr(src->extras.data, "\"radius\"");
+                if (radius)
+                    sscanf(radius, "\"radius\"%*[^0-9.%] %f", &spot->radius);
+                
+                const char* shadowChannel = strstr(src->extras.data, "\"shadowChannel\"");
+                if (shadowChannel)
+                    sscanf(shadowChannel, "\"shadowChannel\"%*[^0-9] %d", &spot->shadowChannel);
+            }
             dst = spot;
             break;
         }

@@ -205,6 +205,7 @@ void SpotLight::Load(const Json::Value& node)
     node["outerAngle"] >> outerAngle;
     node["radius"] >> radius;
     node["range"] >> range;
+    node["shadowChannel"] >> shadowChannel;
 }
 
 void SpotLight::Store(Json::Value& node) const
@@ -281,6 +282,7 @@ void PointLight::Load(const Json::Value& node)
     node["intensity"] >> intensity;
     node["radius"] >> radius;
     node["range"] >> range;
+    node["shadowChannel"] >> shadowChannel;
 }
 
 void PointLight::Store(Json::Value& node) const
