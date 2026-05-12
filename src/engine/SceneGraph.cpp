@@ -330,6 +330,21 @@ void SceneGraphNode::SetName(const std::string& name)
     m_Name = name;
 }
 
+void SceneGraphNode::SetStateFlags(SceneStateFlags flags)
+{
+    SceneGraphWalker walker(this);
+
+    if (!walker)
+        return;
+
+    while (walker)
+    {
+        walker.Next(true);
+        walker->SetStateFlags(flags);
+    }
+    m_SceneStateFlags |= flags;
+}
+
 int SceneGraphWalker::Next(bool allowChildren)
 {
     if (!m_Current)
@@ -1010,6 +1025,9 @@ void SceneGraph::Refresh(uint32_t frameIndex)
                 dm::box3 localBoundingBox = current->m_Leaf->GetLocalBoundingBox();
                 if (!localBoundingBox.isempty())
                     current->m_GlobalBoundingBox = localBoundingBox * current->m_GlobalTransformFloat;
+
+                if ((current->m_SceneStateFlags & SceneStateFlags::ExcludeFromGlobalBoundingBox) != 0)
+                    current->m_GlobalBoundingBox = dm::box3(dm::float3(-1.f, -1.f, -1.f), dm::float3(1.f, 1.f, 1.f));
             }
         }
 

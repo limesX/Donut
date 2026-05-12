@@ -73,9 +73,10 @@ void InstancedOpaqueDrawStrategy::FillChunk()
         auto relevantContentFlags = SceneContentFlags::OpaqueMeshes | SceneContentFlags::AlphaTestedMeshes;
         bool subgraphContentRelevant = (m_Walker->GetSubgraphContentFlags() & relevantContentFlags) != 0;
         bool nodeContentsRelevant = (m_Walker->GetLeafContentFlags() & relevantContentFlags) != 0;
+        bool skipRendering = (m_Walker->GetStateFlags() & SceneStateFlags::SkipRendering) != 0;
 
         bool nodeVisible = false;
-        if (subgraphContentRelevant)
+        if (subgraphContentRelevant && !skipRendering)
         {
             nodeVisible = m_ViewFrustum.intersectsWith(m_Walker->GetGlobalBoundingBox());
 
@@ -186,9 +187,10 @@ void TransparentDrawStrategy::PrepareForView(const std::shared_ptr<engine::Scene
         auto relevantContentFlags = SceneContentFlags::BlendedMeshes;
         bool subgraphContentRelevant = (walker->GetSubgraphContentFlags() & relevantContentFlags) != 0;
         bool nodeContentsRelevant = (walker->GetLeafContentFlags() & relevantContentFlags) != 0;
+        bool skipRendering = (walker->GetStateFlags() & SceneStateFlags::SkipRendering) != 0;
 
         bool nodeVisible = false;
-        if (subgraphContentRelevant)
+        if (subgraphContentRelevant && !skipRendering)
         {
             nodeVisible = viewFrustum.intersectsWith(walker->GetGlobalBoundingBox());
 

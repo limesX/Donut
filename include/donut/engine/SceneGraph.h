@@ -49,6 +49,13 @@ namespace donut::engine
         Animations = 0x20
     };
 
+    enum struct SceneStateFlags : uint32_t
+    {
+        None = 0,
+        SkipRendering = 0x01,
+        ExcludeFromGlobalBoundingBox = 0x02,
+    };
+
     class SceneGraphLeaf
     {
     private:
@@ -66,6 +73,7 @@ namespace donut::engine
         [[nodiscard]] virtual dm::box3 GetLocalBoundingBox() { return dm::box3::empty(); }
         [[nodiscard]] virtual std::shared_ptr<SceneGraphLeaf> Clone() = 0;
         [[nodiscard]] virtual SceneContentFlags GetContentFlags() const { return SceneContentFlags::None; }
+        [[nodiscard]] virtual SceneStateFlags GetStateFlags() const { return SceneStateFlags::None; }
         [[nodiscard]] const std::string& GetName() const;
         void SetName(const std::string& name) const;
         virtual void Load(const Json::Value& node) { }
@@ -77,6 +85,15 @@ namespace donut::engine
         SceneGraphLeaf& operator=(const SceneGraphLeaf&) = delete;
         SceneGraphLeaf& operator=(const SceneGraphLeaf&&) = delete;
     };
+
+    inline SceneStateFlags operator | (SceneStateFlags a, SceneStateFlags b) { return SceneStateFlags(uint32_t(a) | uint32_t(b)); }
+    inline SceneStateFlags operator & (SceneStateFlags a, SceneStateFlags b) { return SceneStateFlags(uint32_t(a) & uint32_t(b)); }
+    inline SceneStateFlags operator ~ (SceneStateFlags a) { return SceneStateFlags(~uint32_t(a)); }
+    inline SceneStateFlags operator |= (SceneStateFlags& a, SceneStateFlags b) { a = SceneStateFlags(uint32_t(a) | uint32_t(b)); return a; }
+    inline SceneStateFlags operator &= (SceneStateFlags& a, SceneStateFlags b) { a = SceneStateFlags(uint32_t(a) & uint32_t(b)); return a; }
+    inline bool operator !(SceneStateFlags a) { return uint32_t(a) == 0; }
+    inline bool operator ==(SceneStateFlags a, uint32_t b) { return uint32_t(a) == b; }
+    inline bool operator !=(SceneStateFlags a, uint32_t b) { return uint32_t(a) != b; }
 
     class MeshInstance : public SceneGraphLeaf
     {
@@ -285,6 +302,7 @@ namespace donut::engine
         DirtyFlags m_Dirty = DirtyFlags::None;
         SceneContentFlags m_LeafContent = SceneContentFlags::None;
         SceneContentFlags m_SubgraphContent = SceneContentFlags::None;
+        SceneStateFlags m_SceneStateFlags = SceneStateFlags::None;
 
         void UpdateLocalTransform();
         void PropagateDirtyFlags(SceneGraphNode::DirtyFlags flags);
@@ -307,6 +325,7 @@ namespace donut::engine
         [[nodiscard]] DirtyFlags GetDirtyFlags() const { return m_Dirty; }
         [[nodiscard]] SceneContentFlags GetLeafContentFlags() const { return m_LeafContent; }
         [[nodiscard]] SceneContentFlags GetSubgraphContentFlags() const { return m_SubgraphContent; }
+        [[nodiscard]] SceneStateFlags GetStateFlags() const { return m_SceneStateFlags; }
 
         [[nodiscard]] SceneGraphNode* GetParent() const { return m_Parent; }
         [[nodiscard]] SceneGraphNode* GetChild(size_t index) const { return (index < m_Children.size()) ? m_Children[index].get() : nullptr; }
@@ -326,6 +345,8 @@ namespace donut::engine
         void SetTranslation(const dm::double3& translation);
         void SetLeaf(const std::shared_ptr<SceneGraphLeaf>& leaf);
         void SetName(const std::string& name);
+        void SetStateFlags(SceneStateFlags flags);
+        
 
         // Non-copyable and non-movable
         SceneGraphNode(const SceneGraphNode&) = delete;
