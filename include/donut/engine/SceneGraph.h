@@ -166,6 +166,7 @@ namespace donut::engine
 
         [[nodiscard]] dm::affine3 GetViewToWorldMatrix() const;
         [[nodiscard]] dm::affine3 GetWorldToViewMatrix() const;
+        [[nodiscard]] const bool IsRightHanded() const { return true; }
     };
 
     class PerspectiveCamera : public SceneCamera

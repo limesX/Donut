@@ -30,6 +30,7 @@
 #include <donut/core/log.h>
 
 #include "nvrhi/common/misc.h"
+#include "../thirdparty/meshoptimizer/meshoptimizer.h"
 
 using namespace donut::math;
 using namespace donut::vfs;

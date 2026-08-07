@@ -34,13 +34,21 @@ void BaseCamera::UpdateWorldToView()
     m_MatWorldToView = translation(-m_CameraPos) * m_MatTranslatedWorldToView;
 }
 
-void BaseCamera::BaseLookAt(float3 cameraPos, float3 cameraTarget, float3 cameraUp)
+void BaseCamera::BaseLookAt(float3 cameraPos, float3 cameraTarget, float3 cameraUp, bool rightHanded)
 {
+    m_RightHanded = rightHanded;
+
     this->m_CameraPos = cameraPos;
-    this->m_CameraDir = normalize(cameraTarget - cameraPos);
+    this->m_CameraDir = (m_RightHanded == true)
+        ? normalize(cameraPos - cameraTarget)
+        : normalize(cameraTarget - cameraPos);
     this->m_CameraUp = normalize(cameraUp);
-    this->m_CameraRight = normalize(cross(this->m_CameraDir, this->m_CameraUp));
-    this->m_CameraUp = normalize(cross(this->m_CameraRight, this->m_CameraDir));
+    this->m_CameraRight = (m_RightHanded == true)
+        ? normalize(cross(this->m_CameraUp, this->m_CameraDir))
+        : normalize(cross(this->m_CameraDir, this->m_CameraUp));
+    this->m_CameraUp = (m_RightHanded == true)
+        ? normalize(cross(this->m_CameraDir, this->m_CameraRight))
+        : normalize(cross(this->m_CameraRight, this->m_CameraDir));
 
     UpdateWorldToView();
 }
@@ -84,18 +92,18 @@ void FirstPersonCamera::MouseButtonUpdate(int button, int action, int mods)
     }
 }
 
-void FirstPersonCamera::LookAt(float3 cameraPos, float3 cameraTarget, float3 cameraUp)
+void FirstPersonCamera::LookAt(float3 cameraPos, float3 cameraTarget, float3 cameraUp, bool rightHanded)
 {
     // Make the base method public.
-    BaseLookAt(cameraPos, cameraTarget, cameraUp);
+    BaseLookAt(cameraPos, cameraTarget, cameraUp, rightHanded);
     m_MouseMotionAccumulator = 0.f;
     m_CameraMoveDamp = 0.f;
     m_CameraMovePrev = 0.f;
 }
 
-void FirstPersonCamera::LookTo(dm::float3 cameraPos, dm::float3 cameraDir, dm::float3 cameraUp)
+void FirstPersonCamera::LookTo(dm::float3 cameraPos, dm::float3 cameraDir, dm::float3 cameraUp, bool rightHanded)
 {
-    BaseLookAt(cameraPos, cameraPos + cameraDir, cameraUp);
+    BaseLookAt(cameraPos, cameraPos + cameraDir, cameraUp, rightHanded);
     m_MouseMotionAccumulator = 0.f;
     m_CameraMoveDamp = 0.f;
     m_CameraMovePrev = 0.f;
@@ -116,13 +124,17 @@ std::pair<bool, float3> FirstPersonCamera::AnimateTranslation(float deltaT)
     if (m_KeyboardState[KeyboardControls::MoveForward])
     {
         cameraDirty = true;
-        cameraMoveVec += m_CameraDir * moveStep;
+        cameraMoveVec += (m_RightHanded == true)
+            ? -m_CameraDir * moveStep
+            : m_CameraDir * moveStep;
     }
 
     if (m_KeyboardState[KeyboardControls::MoveBackward])
     {
         cameraDirty = true;
-        cameraMoveVec += -m_CameraDir * moveStep;
+        cameraMoveVec += (m_RightHanded == true) 
+            ? m_CameraDir * moveStep
+            : -m_CameraDir * moveStep;
     }
 
     if (m_KeyboardState[KeyboardControls::MoveLeft])
@@ -156,7 +168,9 @@ void FirstPersonCamera::UpdateCamera(dm::float3 cameraMoveVec, dm::affine3 camer
     m_CameraPos += cameraMoveVec;
     m_CameraDir = normalize(cameraRotation.transformVector(m_CameraDir));
     m_CameraUp = normalize(cameraRotation.transformVector(m_CameraUp));
-    m_CameraRight = normalize(cross(m_CameraDir, m_CameraUp));
+    m_CameraRight = (m_RightHanded == true)
+        ? normalize(cross(m_CameraUp, m_CameraDir))
+        : normalize(cross(m_CameraDir, m_CameraUp));
 
     UpdateWorldToView();
 }
@@ -462,8 +476,10 @@ void ThirdPersonCamera::Animate(float deltaT)
     m_MousePosPrev = m_MousePos;
 }
 
-void ThirdPersonCamera::LookAt(dm::float3 cameraPos, dm::float3 cameraTarget)
+void ThirdPersonCamera::LookAt(dm::float3 cameraPos, dm::float3 cameraTarget, bool rightHanded)
 {
+    m_RightHanded = rightHanded;
+
     dm::float3 cameraDir = cameraTarget - cameraPos;
 
     float azimuth, elevation, dirLength;
@@ -476,8 +492,10 @@ void ThirdPersonCamera::LookAt(dm::float3 cameraPos, dm::float3 cameraTarget)
 }
 
 void ThirdPersonCamera::LookTo(dm::float3 cameraPos, dm::float3 cameraDir,
-    std::optional<float> targetDistance)
+    std::optional<float> targetDistance, bool rightHanded)
 {
+    m_RightHanded = rightHanded;
+
     float azimuth, elevation, dirLength;
     dm::cartesianToSpherical(-cameraDir, azimuth, elevation, dirLength);
     cameraDir /= dirLength;
@@ -541,11 +559,11 @@ void SwitchableCamera::SwitchToFirstPerson(bool copyView)
         if (m_SceneCamera)
         {
             dm::affine3 viewToWorld = m_SceneCamera->GetViewToWorldMatrix();
-            m_FirstPerson.LookTo(viewToWorld.m_translation, viewToWorld.m_linear.row2, viewToWorld.m_linear.row1);
+            m_FirstPerson.LookTo(viewToWorld.m_translation, viewToWorld.m_linear.row2, viewToWorld.m_linear.row1, m_SceneCamera->IsRightHanded());
         }
         else
         {
-            m_FirstPerson.LookTo(m_ThirdPerson.GetPosition(), m_ThirdPerson.GetDir(), m_ThirdPerson.GetUp());
+            m_FirstPerson.LookTo(m_ThirdPerson.GetPosition(), m_ThirdPerson.GetDir(), m_ThirdPerson.GetUp(), m_ThirdPerson.IsRightHanded());
         }
     }
 
@@ -563,11 +581,11 @@ void SwitchableCamera::SwitchToThirdPerson(bool copyView, std::optional<float> t
         if (m_SceneCamera)
         {
             dm::affine3 viewToWorld = m_SceneCamera->GetViewToWorldMatrix();
-            m_ThirdPerson.LookTo(viewToWorld.m_translation, viewToWorld.m_linear.row2, targetDistance);
+            m_ThirdPerson.LookTo(viewToWorld.m_translation, viewToWorld.m_linear.row2, targetDistance, m_SceneCamera->IsRightHanded());
         }
         else
         {
-            m_ThirdPerson.LookTo(m_FirstPerson.GetPosition(), m_FirstPerson.GetDir(), targetDistance);
+            m_ThirdPerson.LookTo(m_FirstPerson.GetPosition(), m_FirstPerson.GetDir(), targetDistance, m_FirstPerson.IsRightHanded());
         }
     }
 

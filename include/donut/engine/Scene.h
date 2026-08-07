@@ -79,6 +79,9 @@ namespace donut::engine
         struct Resources; // Hide the implementation to avoid including <material_cb.h> and <bindless.h> here
         std::shared_ptr<Resources> m_Resources;
 
+        bool m_CreateMaterialTestBuffer = false;
+        bool m_UpdateMaterialTestBuffer = false;
+
         void LoadModelAsync(
             uint32_t index,
             const std::filesystem::path& fileName,

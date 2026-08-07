@@ -77,12 +77,18 @@ void PlanarView::UpdateCache()
     m_ProjMatrixInv = inverse(m_ProjMatrix);
     m_ViewProjMatrixInv = m_ProjMatrixInv * affineToHomogeneous(m_ViewMatrixInv);
     m_ViewProjOffsetMatrixInv = m_PixelOffsetMatrixInv * m_ViewProjMatrixInv;
-
-    m_ReverseDepth = (m_ProjMatrix[2][2] <= 0.f);
+    
+    //m_ReverseDepth = ((m_ProjMatrix[2][2] * m_ProjMatrix[2][3]) <= 0.f);
+    //m_ReverseDepth = (m_ProjMatrix[2][2] <= 0.f);
+    m_ReverseDepth = (m_RightHandedProjection == true)
+        ? m_ProjMatrix[2][2] >= 0.f
+        : m_ProjMatrix[2][2] <= 0.f;
     m_ViewFrustum = frustum(m_ViewProjMatrix, m_ReverseDepth);
     m_ProjectionFrustum = frustum(m_ProjMatrix, m_ReverseDepth);
 
-    m_IsMirrored = determinant(m_ViewMatrix.m_linear) < 0.f;
+    m_IsMirrored = (m_RightHandedView == true)
+        ? determinant(m_ViewMatrix.m_linear) > 0.f
+        : determinant(m_ViewMatrix.m_linear) < 0.f;
 
     m_CacheValid = true;
 }
@@ -104,10 +110,12 @@ void PlanarView::SetVariableRateShadingState(const nvrhi::VariableRateShadingSta
     m_ShadingRateState = shadingRateState;
 }
 
-void PlanarView::SetMatrices(const affine3& viewMatrix, const float4x4& projMatrix)
+void PlanarView::SetMatrices(const affine3& viewMatrix, const float4x4& projMatrix, bool rightHandedView, bool rightHandedProjection)
 {
     m_ViewMatrix = viewMatrix;
     m_ProjMatrix = projMatrix;
+    m_RightHandedView = rightHandedView;
+    m_RightHandedProjection = rightHandedProjection;
     m_CacheValid = false;
 }
 
@@ -309,7 +317,7 @@ void CubemapView::EnsureCacheIsValid() const
     assert(m_CacheValid); // Call UpdateCache() after changing any view parameters
 }
 
-void CubemapView::SetTransform(affine3 viewMatrix, float zNear, float cullDistance, bool useReverseInfiniteProjections)
+void CubemapView::SetTransform(affine3 viewMatrix, float zNear, float cullDistance, bool useReverseInfiniteProjections, bool rightHandedView)
 {
     m_ViewMatrix = viewMatrix;
     m_NearPlane = zNear;
@@ -330,7 +338,7 @@ void CubemapView::SetTransform(affine3 viewMatrix, float zNear, float cullDistan
     {
         affine3 faceViewMatrix = m_ViewMatrix * affine3(g_CubemapViewMatrices[face], float3(0.f));
 
-        m_FaceViews[face].SetMatrices(faceViewMatrix, faceProjMatrix);
+        m_FaceViews[face].SetMatrices(faceViewMatrix, faceProjMatrix, rightHandedView, false);
     }
 
     m_CacheValid = false;

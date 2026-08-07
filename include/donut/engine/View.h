@@ -110,19 +110,24 @@ namespace donut::engine
         bool m_ReverseDepth = false;
         bool m_IsMirrored = false;
         bool m_CacheValid = false;
+        bool m_RightHandedView = false;
+        bool m_RightHandedProjection = false;
 
         void EnsureCacheIsValid() const;
         
     public:
         void SetViewport(const nvrhi::Viewport& viewport);
         void SetVariableRateShadingState(const nvrhi::VariableRateShadingState& shadingRateState);
-        void SetMatrices(const dm::affine3& viewMatrix, const dm::float4x4& projMatrix);
+        void SetMatrices(const dm::affine3& viewMatrix, const dm::float4x4& projMatrix, bool rightHandedView, bool rightHandedProjection);
         void SetPixelOffset(dm::float2 offset);
         void SetArraySlice(int arraySlice);
         void UpdateCache();
 
         [[nodiscard]] const nvrhi::Viewport& GetViewport() const { return m_Viewport; }
         [[nodiscard]] const nvrhi::Rect& GetScissorRect() const { return m_ScissorRect; }
+
+        [[nodiscard]] const bool IsRightHandedView() const { return m_RightHandedView; }
+        [[nodiscard]] const bool IsRightHandedProjection() const { return m_RightHandedProjection; }
 
         [[nodiscard]] nvrhi::ViewportState GetViewportState() const override;
         [[nodiscard]] nvrhi::VariableRateShadingState GetVariableRateShadingState() const override;
@@ -358,7 +363,7 @@ namespace donut::engine
         void EnsureCacheIsValid() const;
 
     public:
-        void SetTransform(dm::affine3 viewMatrix, float zNear, float cullDistance, bool useReverseInfiniteProjections = true);
+        void SetTransform(dm::affine3 viewMatrix, float zNear, float cullDistance, bool useReverseInfiniteProjections, bool rightHandedView);
         void SetArrayViewports(int resolution, int firstArraySlice);
         void UpdateCache();
 

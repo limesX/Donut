@@ -62,11 +62,12 @@ namespace donut::app
         [[nodiscard]] const dm::float3& GetPosition() const { return m_CameraPos; }
         [[nodiscard]] const dm::float3& GetDir() const { return m_CameraDir; }
         [[nodiscard]] const dm::float3& GetUp() const { return m_CameraUp; }
+        [[nodiscard]] const bool IsRightHanded() const { return m_RightHanded; }
 
     protected:
         // This can be useful for derived classes while not necessarily public, i.e., in a third person
         // camera class, public clients cannot direct the gaze point.
-        void BaseLookAt(dm::float3 cameraPos, dm::float3 cameraTarget, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
+        void BaseLookAt(dm::float3 cameraPos, dm::float3 cameraTarget, dm::float3 cameraUp, bool rightHanded);
         void UpdateWorldToView();
 
         dm::affine3 m_MatWorldToView = dm::affine3::identity();
@@ -79,6 +80,8 @@ namespace donut::app
 
         float m_MoveSpeed = 1.f;      // movement speed in units/second
         float m_RotateSpeed = .005f;  // mouse sensitivity in radians/pixel
+
+        bool m_RightHanded = false;
     };
 
     class FirstPersonCamera : public BaseCamera
@@ -90,8 +93,8 @@ namespace donut::app
         void Animate(float deltaT) override;
         void AnimateSmooth(float deltaT);
 
-        void LookAt(dm::float3 cameraPos, dm::float3 cameraTarget, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
-        void LookTo(dm::float3 cameraPos, dm::float3 cameraDir, dm::float3 cameraUp = dm::float3{ 0.f, 1.f, 0.f });
+        void LookAt(dm::float3 cameraPos, dm::float3 cameraTarget, dm::float3 cameraUp, bool rightHanded);
+        void LookTo(dm::float3 cameraPos, dm::float3 cameraDir, dm::float3 cameraUp, bool rightHanded);
 
     private:
         std::pair<bool, dm::affine3> AnimateRoll(dm::affine3 initialRotation);
@@ -192,9 +195,8 @@ namespace donut::app
 
         void SetView(const engine::PlanarView& view);
 
-        void LookAt(dm::float3 cameraPos, dm::float3 cameraTarget);
-        void LookTo(dm::float3 cameraPos, dm::float3 cameraDir,
-            std::optional<float> targetDistance = std::optional<float>());
+        void LookAt(dm::float3 cameraPos, dm::float3 cameraTarget, bool rightHanded);
+        void LookTo(dm::float3 cameraPos, dm::float3 cameraDir, std::optional<float> targetDistance, bool rightHanded);
         
     private:
         void AnimateOrbit(float deltaT, dm::float2 mouseMove);

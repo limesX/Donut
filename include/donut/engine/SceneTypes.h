@@ -266,17 +266,49 @@ namespace donut::engine
         VertexAttribute vertexBuffers[16];
         uint32_t numVertexBuffers;
     };
+    
+    static constexpr uint64_t MESHLET_MAX_TRIANGLES = 124;
+    static constexpr uint64_t MESHLET_MAX_VERTICES = 64;
+    
+    struct MeshletTriangle
+    {
+        uint32_t V0 : 10;
+        uint32_t V1 : 10;
+        uint32_t V2 : 10;
+        uint32_t : 2;
+    };
+    
+    struct Meshlet
+    {
+        float center[3];
+        float radius;
+        
+        uint32_t vertex_count;
+        uint32_t triangle_count;
+        
+        uint32_t vertex_offset;
+        uint32_t triangle_offset;
+    };
 
     struct BufferGroup
     {
+        nvrhi::BufferHandle meshletBuffer;
+        nvrhi::BufferHandle meshletVertexBuffer;
+        nvrhi::BufferHandle meshletTriangleBuffer;
         nvrhi::BufferHandle indexBuffer;
         nvrhi::BufferHandle vertexBuffer;
         nvrhi::BufferHandle instanceBuffer;
+        std::shared_ptr<DescriptorHandle> meshletBufferDescriptor;
+        std::shared_ptr<DescriptorHandle> meshletVertexBufferDescriptor;
+        std::shared_ptr<DescriptorHandle> meshletTriangleDescriptor;
         std::shared_ptr<DescriptorHandle> indexBufferDescriptor;
         std::shared_ptr<DescriptorHandle> vertexBufferDescriptor;
         std::shared_ptr<DescriptorHandle> instnaceBufferDescriptor;
         std::array<nvrhi::BufferRange, size_t(VertexAttribute::Count)> vertexBufferRanges;
         std::vector<nvrhi::BufferRange> morphTargetBufferRange;
+        std::vector<Meshlet> meshlets;
+        std::vector<uint32_t> meshletVertices;
+        std::vector<MeshletTriangle> meshletTriangles;
         std::vector<uint32_t> indexData;
         std::vector<dm::float3> positionData;
         std::vector<dm::float2> texcoord1Data;
@@ -306,6 +338,8 @@ namespace donut::engine
     {
         std::shared_ptr<Material> material;
         dm::box3 objectSpaceBounds;
+        uint32_t meshletOffset = 0;
+        uint32_t meshletCount = 0;
         uint32_t indexOffsetInMesh = 0;
         uint32_t vertexOffsetInMesh = 0;
         uint32_t numIndices = 0;

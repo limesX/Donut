@@ -99,7 +99,7 @@ bool PlanarShadowMap::SetupWholeSceneDirectionalLightView(const DirectionalLight
 
     bool viewIsModified = m_View->GetViewMatrix() != worldToView || any(m_View->GetProjectionMatrix(false) != projection);
 
-    m_View->SetMatrices(worldToView, projection);
+    m_View->SetMatrices(worldToView, projection, true, false);
     m_View->UpdateCache();
 
     m_FadeRangeTexels = clamp(
@@ -138,7 +138,7 @@ bool PlanarShadowMap::SetupDynamicDirectionalLightView(const DirectionalLight& l
 
     bool viewIsModified = m_View->GetViewMatrix() != worldToView || any(m_View->GetProjectionMatrix(false) != projection);
 
-    m_View->SetMatrices(worldToView, projection);
+    m_View->SetMatrices(worldToView, projection, true, false);
     m_View->UpdateCache();
 
     m_FadeRangeTexels = clamp(
@@ -156,7 +156,7 @@ void PlanarShadowMap::SetupProxyView()
 
     float4x4 projection = orthoProjD3DStyle(-1.f, 1.f, -1.f, 1.f, -1.f, 1.f);
 
-    m_View->SetMatrices(worldToView, projection);
+    m_View->SetMatrices(worldToView, projection, true, false);
     m_View->UpdateCache();
 }
 

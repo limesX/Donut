@@ -706,6 +706,8 @@ void Scene::RefreshBuffers(nvrhi::ICommandList* commandList, uint32_t frameIndex
 
     if (m_EnableBindlessResources && (materialsChanged || m_SceneStructureChanged || arraysAllocated))
     {
+        m_UpdateMaterialTestBuffer = true;
+
         WriteMaterialBuffer(commandList);
     }
 
@@ -1111,6 +1113,8 @@ nvrhi::BufferHandle Scene::CreateMaterialBuffer()
     bufferDesc.canHaveUAVs = true;
     bufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
     bufferDesc.keepInitialState = true;
+
+    m_CreateMaterialTestBuffer = true;
 
     return m_Device->createBuffer(bufferDesc);
 }
