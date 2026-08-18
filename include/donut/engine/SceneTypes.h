@@ -150,6 +150,15 @@ namespace donut::engine
         Count
     };
 
+    enum class MeshletAttribute
+    {
+        Meshlet,
+        Vertex,
+        Triangle,
+
+        Count
+    };
+
     nvrhi::VertexAttributeDesc GetVertexAttributeDesc(VertexAttribute attribute, const char* name, uint32_t bufferIndex);
 
 
@@ -293,18 +302,19 @@ namespace donut::engine
     struct BufferGroup
     {
         nvrhi::BufferHandle meshletBuffer;
-        nvrhi::BufferHandle meshletVertexBuffer;
-        nvrhi::BufferHandle meshletTriangleBuffer;
+        //nvrhi::BufferHandle meshletVertexBuffer;
+        //nvrhi::BufferHandle meshletTriangleBuffer;
         nvrhi::BufferHandle indexBuffer;
         nvrhi::BufferHandle vertexBuffer;
         nvrhi::BufferHandle instanceBuffer;
         std::shared_ptr<DescriptorHandle> meshletBufferDescriptor;
-        std::shared_ptr<DescriptorHandle> meshletVertexBufferDescriptor;
-        std::shared_ptr<DescriptorHandle> meshletTriangleDescriptor;
+        //std::shared_ptr<DescriptorHandle> meshletVertexBufferDescriptor;
+        //std::shared_ptr<DescriptorHandle> meshletTriangleDescriptor;
         std::shared_ptr<DescriptorHandle> indexBufferDescriptor;
         std::shared_ptr<DescriptorHandle> vertexBufferDescriptor;
         std::shared_ptr<DescriptorHandle> instnaceBufferDescriptor;
         std::array<nvrhi::BufferRange, size_t(VertexAttribute::Count)> vertexBufferRanges;
+        std::array<nvrhi::BufferRange, size_t(MeshletAttribute::Count)> meshletBufferRanges;
         std::vector<nvrhi::BufferRange> morphTargetBufferRange;
         std::vector<Meshlet> meshlets;
         std::vector<uint32_t> meshletVertices;
@@ -323,6 +333,7 @@ namespace donut::engine
         [[nodiscard]] bool hasAttribute(VertexAttribute attr) const { return vertexBufferRanges[int(attr)].byteSize != 0; }
         nvrhi::BufferRange& getVertexBufferRange(VertexAttribute attr) { return vertexBufferRanges[int(attr)]; }
         [[nodiscard]] const nvrhi::BufferRange& getVertexBufferRange(VertexAttribute attr) const { return vertexBufferRanges[int(attr)]; }
+        nvrhi::BufferRange& getMeshletBufferRange(MeshletAttribute attr) { return meshletBufferRanges[int(attr)]; }
     };
 
     enum class MeshGeometryPrimitiveType : uint8_t
@@ -338,13 +349,18 @@ namespace donut::engine
     {
         std::shared_ptr<Material> material;
         dm::box3 objectSpaceBounds;
-        uint32_t meshletOffset = 0;
-        uint32_t meshletCount = 0;
+        uint32_t meshletOffsetInMesh = 0;
+        uint32_t meshletVertexOffsetInMesh = 0;
+        uint32_t meshletTriangleOffsetInMesh = 0;
         uint32_t indexOffsetInMesh = 0;
         uint32_t vertexOffsetInMesh = 0;
+        uint32_t numMeshlets = 0;
+        uint32_t numMeshletVertices = 0;
+        uint32_t numMeshletTriangles = 0;
         uint32_t numIndices = 0;
         uint32_t numVertices = 0;
         int globalGeometryIndex = 0;
+        uint32_t geometryIndexInMesh = 0;
 
         MeshGeometryPrimitiveType type = MeshGeometryPrimitiveType::Triangles;
 
@@ -369,8 +385,14 @@ namespace donut::engine
         std::shared_ptr<MeshInfo> skinPrototype;
         std::vector<std::shared_ptr<MeshGeometry>> geometries;
         dm::box3 objectSpaceBounds;
+        uint32_t meshletOffset = 0;
+        uint32_t meshletVertexOffset = 0;
+        uint32_t meshletTriangleOffset = 0;
         uint32_t indexOffset = 0;
         uint32_t vertexOffset = 0;
+        uint32_t totalMeshlets = 0;
+        uint32_t totalMeshletVertices = 0;
+        uint32_t totalMeshletTriangles = 0;
         uint32_t totalIndices = 0;
         uint32_t totalVertices = 0;
         int globalMeshIndex = 0;

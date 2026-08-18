@@ -43,9 +43,13 @@ struct GeometryData
     uint curveRadiusOffset;
 
     uint materialIndex;
-    uint pad0;
-    uint pad1;
-    uint pad2;
+    uint numMeshlets;
+    int meshletBufferIndex;
+    uint meshletOffset;
+
+    uint meshletVertexOffset;
+    uint meshletTriangleOffset;
+    uint2 pad0;
 };
 
 static const uint InstanceFlags_CurveDisjointOrthogonalTriangleStrips = 0x00000001u;
@@ -105,9 +109,9 @@ GeometryData LoadGeometryData(ByteAddressBuffer buffer, uint offset)
     ret.tangentOffset = c.z;
     ret.curveRadiusOffset = c.w;
     ret.materialIndex = d.x;
-    ret.pad0 = d.y;
-    ret.pad1 = d.z;
-    ret.pad2 = d.w;
+    ret.meshletOffset = d.y;
+    ret.numMeshlets = d.z;
+    ret.meshletBufferIndex = int(d.w);
     return ret;
 }
 

@@ -1192,6 +1192,9 @@ void Scene::UpdateGeometry(const std::shared_ptr<MeshInfo>& mesh)
     // TODO: support 64-bit buffer offsets in the CB.
     for (const auto& geometry : mesh->geometries)
     {
+        uint32_t meshletOffset = mesh->meshletOffset + geometry->meshletOffsetInMesh;
+        uint32_t meshletVertexOffset = mesh->meshletVertexOffset + geometry->meshletVertexOffsetInMesh;
+        uint32_t meshletTriangleOffset = mesh->meshletTriangleOffset + geometry->meshletTriangleOffsetInMesh;
         uint32_t indexOffset = mesh->indexOffset + geometry->indexOffsetInMesh;
         uint32_t vertexOffset = mesh->vertexOffset + geometry->vertexOffsetInMesh;
 
@@ -1216,6 +1219,15 @@ void Scene::UpdateGeometry(const std::shared_ptr<MeshInfo>& mesh)
         gdata.curveRadiusOffset = mesh->buffers->hasAttribute(VertexAttribute::CurveRadius)
             ? uint32_t(vertexOffset * sizeof(float) + mesh->buffers->getVertexBufferRange(VertexAttribute::CurveRadius).byteOffset) : ~0u;
         gdata.materialIndex = geometry->material ? geometry->material->materialID : ~0u;
+        gdata.numMeshlets = geometry->numMeshlets;
+        gdata.meshletBufferIndex = mesh->buffers->meshletBufferDescriptor ? mesh->buffers->meshletBufferDescriptor->Get() : -1;
+        //gdata.meshletOffset = meshletOffset * sizeof(Meshlet);
+        //gdata.meshletVertexOffset = meshletVertexOffset * sizeof(uint32_t);
+        //gdata.meshletTriangleOffset = meshletTriangleOffset * sizeof(MeshletTriangle);        
+        gdata.meshletOffset = uint32_t(meshletOffset * sizeof(Meshlet) + mesh->buffers->getMeshletBufferRange(MeshletAttribute::Meshlet).byteOffset);
+        gdata.meshletVertexOffset = uint32_t(meshletVertexOffset * sizeof(uint32_t) + mesh->buffers->getMeshletBufferRange(MeshletAttribute::Vertex).byteOffset);
+        gdata.meshletTriangleOffset = uint32_t(meshletTriangleOffset * sizeof(MeshletTriangle) + mesh->buffers->getMeshletBufferRange(MeshletAttribute::Triangle).byteOffset);
+        int a = 10;
     }
 }
 

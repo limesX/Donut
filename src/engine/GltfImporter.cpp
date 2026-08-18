@@ -36,6 +36,21 @@ using namespace donut::math;
 using namespace donut::vfs;
 using namespace donut::engine;
 
+struct OptimizedMeshData
+{
+    std::vector<uint32_t> indices;
+    std::vector<float3> positions_stream;
+    std::vector<float> radius_stream;
+    std::vector<float3> normals_stream;
+    std::vector<float4> tangents_stream;
+    std::vector<float2> uvs_stream;
+    std::vector<vector<uint16_t, 4>> joints_stream;
+    std::vector<float4> weights_stream;
+    
+    std::vector<Meshlet> meshlets;
+    std::vector<uint32_t> meshlet_vertices;
+    std::vector<MeshletTriangle> meshlet_triangles;
+};
 
 class BufferRegionBlob : public IBlob
 {
@@ -1012,6 +1027,9 @@ bool GltfImporter::Load(
         materials[&material] = matinfo;
     }
     
+    size_t totalMeshlets = 0;
+    size_t totalMeshletVertices = 0;
+    size_t totalMeshletTriangles = 0;
     size_t totalIndices = 0;
     size_t totalVertices = 0;
     size_t morphTargetTotalVertices = 0;
@@ -1032,12 +1050,12 @@ bool GltfImporter::Load(
             {
                 continue;
             }
-
-            if (prim.indices)
+            
+            /*if (prim.indices)
                 totalIndices += prim.indices->count;
             else
                 totalIndices += prim.attributes->data->count;
-            totalVertices += prim.attributes->data->count;
+            totalVertices += prim.attributes->data->count;*/
 
             if (!hasJoints)
             {
@@ -1057,7 +1075,7 @@ bool GltfImporter::Load(
 
     auto buffers = std::make_shared<BufferGroup>();
 
-    buffers->indexData.resize(totalIndices);
+    /*buffers->indexData.resize(totalIndices);
     buffers->positionData.resize(totalVertices);
     buffers->normalData.resize(totalVertices);
     buffers->tangentData.resize(totalVertices);
@@ -1071,9 +1089,9 @@ bool GltfImporter::Load(
         buffers->weightData.resize(totalVertices);
     }
 
-    morphTargetTotalVertices = totalVertices;
+    morphTargetTotalVertices = totalVertices; // TODO poprati ovog
     totalIndices = 0;
-    totalVertices = 0;
+    totalVertices = 0;*/
 
     std::unordered_map<const cgltf_mesh*, std::shared_ptr<MeshInfo>> meshMap;
 
@@ -1087,8 +1105,12 @@ bool GltfImporter::Load(
         const cgltf_mesh& mesh = objects->meshes[mesh_idx];
 
         std::shared_ptr<MeshInfo> minfo = m_SceneTypeFactory->CreateMesh();
-        if (mesh.name) minfo->name = mesh.name;
+        if (mesh.name)
+            minfo->name = mesh.name;
         minfo->buffers = buffers;
+        minfo->meshletOffset = (uint32_t)totalMeshlets;
+        minfo->meshletVertexOffset = (uint32_t)totalMeshletVertices;
+        minfo->meshletTriangleOffset = (uint32_t)totalMeshletTriangles;
         minfo->indexOffset = (uint32_t)totalIndices;
         minfo->vertexOffset = (uint32_t)totalVertices;
         meshes.push_back(minfo);
@@ -1184,16 +1206,21 @@ bool GltfImporter::Load(
 
             assert(positions);
 
+            OptimizedMeshData mesh_data;
+
             size_t indexCount = 0;
 
             if (prim.indices)
             {
                 indexCount = prim.indices->count;
 
+                mesh_data.indices.resize(indexCount);
+
                 // copy the indices
                 auto [indexSrc, indexStride] = cgltf_buffer_iterator(prim.indices, 0);
 
-                uint32_t* indexDst = buffers->indexData.data() + totalIndices;
+                //uint32_t* indexDst = buffers->indexData.data() + totalIndices;
+                uint32_t* indexDst = mesh_data.indices.data();
 
                 switch(prim.indices->component_type)
                 {
@@ -1235,21 +1262,26 @@ bool GltfImporter::Load(
             {
                 indexCount = positions->count;
 
+                mesh_data.indices.resize(indexCount);
+
                 // generate the indices
-                uint32_t* indexDst = buffers->indexData.data() + totalIndices;
+                //uint32_t* indexDst = buffers->indexData.data() + totalIndices;
+                uint32_t* indexDst = mesh_data.indices.data();
                 for (size_t i_idx = 0; i_idx < indexCount; i_idx++)
                 {
                     *indexDst = (uint32_t)i_idx;
                     indexDst++;
                 }
-            }
+            }            
 
             dm::box3 bounds = dm::box3::empty();
 
             if (positions)
             {
                 auto [positionSrc, positionStride] = cgltf_buffer_iterator(positions, sizeof(float) * 3);
-                float3* positionDst = buffers->positionData.data() + totalVertices;
+                //float3* positionDst = buffers->positionData.data() + totalVertices;
+                mesh_data.positions_stream.resize(positions->count);
+                float3* positionDst = mesh_data.positions_stream.data();
 
                 for (size_t v_idx = 0; v_idx < positions->count; v_idx++)
                 {
@@ -1260,12 +1292,14 @@ bool GltfImporter::Load(
                     positionSrc += positionStride;
                     ++positionDst;
                 }
-            }
+            }            
 
             if (radius)
             {
                 auto [radiusSrc, radiusStride] = cgltf_buffer_iterator(radius, sizeof(float));
-                float* radiusDst = buffers->radiusData.data() + totalVertices;
+                //float* radiusDst = buffers->radiusData.data() + totalVertices;
+                mesh_data.radius_stream.resize(radius->count);
+                float* radiusDst = mesh_data.radius_stream.data();
                 for (size_t v_idx = 0; v_idx < radius->count; v_idx++)
                 {
                     *radiusDst = *(const float*)radiusSrc;
@@ -1286,12 +1320,15 @@ bool GltfImporter::Load(
                 assert(normals->count == positions->count);
 
                 auto [normalSrc, normalStride] = cgltf_buffer_iterator(normals, sizeof(float) * 3);
-                uint32_t* normalDst = buffers->normalData.data() + totalVertices;
+                //uint32_t* normalDst = buffers->normalData.data() + totalVertices;
+                mesh_data.normals_stream.resize(normals->count);
+                float3* normalDst = mesh_data.normals_stream.data();
 
                 for (size_t v_idx = 0; v_idx < normals->count; v_idx++)
                 {
-                    float3 normal = (const float*)normalSrc;
-                    *normalDst = vectorToSnorm8(normal);
+                    //float3 normal = (const float*)normalSrc;
+                    //*normalDst = vectorToSnorm8(normal);
+                    *normalDst = (const float*)normalSrc;
 
                     normalSrc += normalStride;
                     ++normalDst;
@@ -1303,13 +1340,16 @@ bool GltfImporter::Load(
                 assert(tangents->count == positions->count);
 
                 auto [tangentSrc, tangentStride] = cgltf_buffer_iterator(tangents, sizeof(float) * 4);
-                uint32_t* tangentDst = buffers->tangentData.data() + totalVertices;
+                //uint32_t* tangentDst = buffers->tangentData.data() + totalVertices;
+                mesh_data.tangents_stream.resize(tangents->count);
+                float4* tangentDst = mesh_data.tangents_stream.data();
                 
                 for (size_t v_idx = 0; v_idx < tangents->count; v_idx++)
                 {
-                    float4 tangent = (const float*)tangentSrc;
-                    *tangentDst = vectorToSnorm8(tangent);
-
+                    //float4 tangent = (const float*)tangentSrc;
+                    //*tangentDst = vectorToSnorm8(tangent);
+                    *tangentDst = (const float*)tangentSrc;
+                    
                     tangentSrc += tangentStride;
                     ++tangentDst;
                 }
@@ -1320,7 +1360,9 @@ bool GltfImporter::Load(
                 assert(texcoords->count == positions->count);
 
                 auto [texcoordSrc, texcoordStride] = cgltf_buffer_iterator(texcoords, sizeof(float) * 2);
-                float2* texcoordDst = buffers->texcoord1Data.data() + totalVertices;
+                //float2* texcoordDst = buffers->texcoord1Data.data() + totalVertices;
+                mesh_data.uvs_stream.resize(texcoords->count);
+                float2* texcoordDst = mesh_data.uvs_stream.data();
 
                 for (size_t v_idx = 0; v_idx < texcoords->count; v_idx++)
                 {
@@ -1332,20 +1374,23 @@ bool GltfImporter::Load(
             }
             else
             {
-                float2* texcoordDst = buffers->texcoord1Data.data() + totalVertices;
+                //float2* texcoordDst = buffers->texcoord1Data.data() + totalVertices;
+                mesh_data.uvs_stream.resize(positions->count);
+                float2* texcoordDst = mesh_data.uvs_stream.data();
                 for (size_t v_idx = 0; v_idx < positions->count; v_idx++)
                 {
                     *texcoordDst = float2(0.f);
                     ++texcoordDst;
                 }
-            }
+            }            
 
             if (normals && texcoords && (!tangents || c_ForceRebuildTangents))
             {
                 auto [positionSrc, positionStride] = cgltf_buffer_iterator(positions, sizeof(float) * 3);
                 auto [texcoordSrc, texcoordStride] = cgltf_buffer_iterator(texcoords, sizeof(float) * 2);
                 auto [normalSrc, normalStride] = cgltf_buffer_iterator(normals, sizeof(float) * 3);
-                const uint32_t* indexSrc = buffers->indexData.data() + totalIndices;
+                //const uint32_t* indexSrc = buffers->indexData.data() + totalIndices;
+                const uint32_t* indexSrc = mesh_data.indices.data();
 
                 computedTangents.resize(positions->count);
                 std::fill(computedTangents.begin(), computedTangents.end(), float3(0.f));
@@ -1400,7 +1445,10 @@ bool GltfImporter::Load(
                     tangentStride = pair.second;
                 }
 
-                uint32_t* tangentDst = buffers->tangentData.data() + totalVertices;
+                //uint32_t* tangentDst = buffers->tangentData.data() + totalVertices;
+                std::vector<float4>().swap(mesh_data.tangents_stream);
+                mesh_data.tangents_stream.resize(positions->count);
+                float4* tangentDst = mesh_data.tangents_stream.data();
 
                 for (size_t v_idx = 0; v_idx < positions->count; v_idx++)
                 {
@@ -1419,13 +1467,14 @@ bool GltfImporter::Load(
                         sign = (dot(cross_b, bitangent) > 0) ? -1.f : 1.f;
                     }
 
-                    *tangentDst = vectorToSnorm8(float4(tangent, sign));
+                    //*tangentDst = vectorToSnorm8(float4(tangent, sign));
+                    *tangentDst = float4(tangent, sign);
 
                     if (c_ForceRebuildTangents && tangents)
                     {
                         *(float4*)tangentSrc = float4(tangent, sign);
                         tangentSrc += tangentStride;
-                    }
+                    }                    
                     
                     normalSrc += normalStride;
                     ++tangentDst;
@@ -1439,7 +1488,8 @@ bool GltfImporter::Load(
                 assert(joint_indices->count == positions->count);
 
                 auto [jointSrc, jointStride] = cgltf_buffer_iterator(joint_indices, 0);
-                vector<uint16_t, 4>* jointDst = buffers->jointData.data() + totalVertices;
+                //vector<uint16_t, 4>* jointDst = buffers->jointData.data() + totalVertices;
+                vector<uint16_t, 4>* jointDst = mesh_data.joints_stream.data();
 
                 if (joint_indices->component_type == cgltf_component_type_r_8u)
                 {
@@ -1477,7 +1527,8 @@ bool GltfImporter::Load(
                 assert(joint_weights->count == positions->count);
 
                 auto [weightSrc, weightStride] = cgltf_buffer_iterator(joint_weights, 0);
-                float4* weightDst = buffers->weightData.data() + totalVertices;
+                //float4* weightDst = buffers->weightData.data() + totalVertices;
+                float4* weightDst = mesh_data.weights_stream.data();
 
                 if (joint_weights->component_type == cgltf_component_type_r_8u)
                 {
@@ -1527,6 +1578,98 @@ bool GltfImporter::Load(
                     }
                 }
             }
+
+            uint64_t vertex_count = prim.attributes->data->count;
+            assert(positions->count == vertex_count);
+
+            meshopt_optimizeVertexCache(mesh_data.indices.data(), mesh_data.indices.data(), mesh_data.indices.size(), vertex_count);
+            meshopt_optimizeOverdraw(mesh_data.indices.data(), mesh_data.indices.data(), mesh_data.indices.size(), &mesh_data.positions_stream[0].x, vertex_count, sizeof(float3), 1.05f);
+            std::vector<uint32_t> remap(vertex_count);
+            meshopt_optimizeVertexFetchRemap(&remap[0], mesh_data.indices.data(), mesh_data.indices.size(), vertex_count);
+            meshopt_remapIndexBuffer(mesh_data.indices.data(), mesh_data.indices.data(), mesh_data.indices.size(), &remap[0]);
+            meshopt_remapVertexBuffer(mesh_data.positions_stream.data(), mesh_data.positions_stream.data(), vertex_count, sizeof(float3),&remap[0]);
+            meshopt_remapVertexBuffer(mesh_data.normals_stream.data(), mesh_data.normals_stream.data(), mesh_data.normals_stream.size(), sizeof(float3), &remap[0]);
+            meshopt_remapVertexBuffer(mesh_data.tangents_stream.data(), mesh_data.tangents_stream.data(), mesh_data.tangents_stream.size(), sizeof(float4), &remap[0]);
+            meshopt_remapVertexBuffer(mesh_data.uvs_stream.data(), mesh_data.uvs_stream.data(), mesh_data.uvs_stream.size(), sizeof(float2), &remap[0]);
+            meshopt_remapVertexBuffer(mesh_data.joints_stream.data(), mesh_data.joints_stream.data(), mesh_data.joints_stream.size(), sizeof(uint16_t) * 4, &remap[0]);
+            meshopt_remapVertexBuffer(mesh_data.weights_stream.data(), mesh_data.weights_stream.data(), mesh_data.weights_stream.size(), sizeof(float4), &remap[0]);
+
+            indexCount = mesh_data.indices.size();
+
+            if (mesh_data.indices.size() > 0)
+                buffers->indexData.insert(buffers->indexData.end(), mesh_data.indices.begin(), mesh_data.indices.end());
+            if (mesh_data.positions_stream.size() > 0)
+                buffers->positionData.insert(buffers->positionData.end(), mesh_data.positions_stream.begin(), mesh_data.positions_stream.end());
+            if (mesh_data.radius_stream.size() > 0)
+                buffers->radiusData.insert(buffers->radiusData.end(), mesh_data.radius_stream.begin(), mesh_data.radius_stream.end());
+            if (mesh_data.normals_stream.size() > 0)
+            {
+                for (const auto& normal : mesh_data.normals_stream)
+                    buffers->normalData.push_back(vectorToSnorm8(normal));
+            }
+            if (mesh_data.tangents_stream.size() > 0)
+            {
+                for (const auto& tangent : mesh_data.tangents_stream)
+                    buffers->tangentData.push_back(vectorToSnorm8(tangent));
+            }
+            if (mesh_data.uvs_stream.size() > 0)
+                buffers->texcoord1Data.insert(buffers->texcoord1Data.end(), mesh_data.uvs_stream.begin(), mesh_data.uvs_stream.end());
+            if (mesh_data.joints_stream.size() > 0)
+                buffers->jointData.insert(buffers->jointData.end(), mesh_data.joints_stream.begin(), mesh_data.joints_stream.end());
+            if (mesh_data.weights_stream.size() > 0)
+                buffers->weightData.insert(buffers->weightData.end(), mesh_data.weights_stream.begin(), mesh_data.weights_stream.end());
+
+            uint64_t const max_meshlets = meshopt_buildMeshletsBound(mesh_data.indices.size(), MESHLET_MAX_VERTICES, MESHLET_MAX_TRIANGLES);
+            mesh_data.meshlets.resize(max_meshlets);
+            mesh_data.meshlet_vertices.resize(max_meshlets* MESHLET_MAX_VERTICES);
+
+            std::vector<uint8_t> meshlet_triangles(max_meshlets* MESHLET_MAX_TRIANGLES * 3);
+            std::vector<meshopt_Meshlet> meshlets(max_meshlets);
+
+            uint64_t meshlet_count = meshopt_buildMeshlets(meshlets.data(), mesh_data.meshlet_vertices.data(), meshlet_triangles.data(),
+                mesh_data.indices.data(), mesh_data.indices.size(), &mesh_data.positions_stream[0].x, mesh_data.positions_stream.size(), sizeof(float3),
+                MESHLET_MAX_VERTICES, MESHLET_MAX_TRIANGLES, 0);
+
+            meshopt_Meshlet const& last = meshlets[meshlet_count - 1];
+            meshlet_triangles.resize(last.triangle_offset + ((last.triangle_count * 3 + 3) & ~3));
+            meshlets.resize(meshlet_count);
+
+            mesh_data.meshlets.resize(meshlet_count);
+            mesh_data.meshlet_vertices.resize(last.vertex_offset + last.vertex_count);
+            mesh_data.meshlet_triangles.resize(meshlet_triangles.size() / 3);
+
+            uint32_t triangle_offset = 0;
+            for (uint64_t i = 0; i < meshlet_count; ++i)
+            {
+                meshopt_Meshlet const& m = meshlets[i];
+                meshopt_Bounds meshopt_bounds = meshopt_computeMeshletBounds(&mesh_data.meshlet_vertices[m.vertex_offset], &meshlet_triangles[m.triangle_offset],
+                    m.triangle_count, reinterpret_cast<float const*>(mesh_data.positions_stream.data()), vertex_count, sizeof(float3));
+
+                uint8_t* src_triangles = meshlet_triangles.data() + m.triangle_offset;
+                for (uint32_t triangle_idx = 0; triangle_idx < m.triangle_count; ++triangle_idx)
+                {
+                    MeshletTriangle& tri = mesh_data.meshlet_triangles[triangle_idx + triangle_offset];
+                    tri.V0 = *src_triangles++;
+                    tri.V1 = *src_triangles++;
+                    tri.V2 = *src_triangles++;
+                }
+
+                Meshlet& meshlet = mesh_data.meshlets[i];
+                std::memcpy(meshlet.center, meshopt_bounds.center, sizeof(float) * 3);
+
+                meshlet.radius = meshopt_bounds.radius;
+                meshlet.vertex_count = m.vertex_count;
+                meshlet.triangle_count = m.triangle_count;
+                meshlet.vertex_offset = m.vertex_offset;
+                meshlet.triangle_offset = triangle_offset;
+                triangle_offset += m.triangle_count;
+
+            }
+            mesh_data.meshlet_triangles.resize(triangle_offset);
+
+            buffers->meshlets.insert(buffers->meshlets.end(), mesh_data.meshlets.begin(), mesh_data.meshlets.end());
+            buffers->meshletVertices.insert(buffers->meshletVertices.end(), mesh_data.meshlet_vertices.begin(), mesh_data.meshlet_vertices.end());
+            buffers->meshletTriangles.insert(buffers->meshletTriangles.end(), mesh_data.meshlet_triangles.begin(), mesh_data.meshlet_triangles.end());
 
             auto geometry = m_SceneTypeFactory->CreateMeshGeometry();
             if (prim.material)
@@ -1592,11 +1735,20 @@ bool GltfImporter::Load(
                 }
             }
 
+            geometry->meshletOffsetInMesh = minfo->totalMeshlets;
+            geometry->meshletVertexOffsetInMesh = minfo->totalMeshletVertices;
+            geometry->meshletTriangleOffsetInMesh = minfo->totalMeshletTriangles;
             geometry->indexOffsetInMesh = minfo->totalIndices;
             geometry->vertexOffsetInMesh = minfo->totalVertices;
+            geometry->numMeshlets = (uint32_t)meshlet_count;
+            geometry->numMeshlets = (uint32_t)mesh_data.meshlets.size();
+            geometry->numMeshletVertices = (uint32_t)mesh_data.meshlet_vertices.size();
+            geometry->numMeshletTriangles = (uint32_t)mesh_data.meshlet_triangles.size();
             geometry->numIndices = (uint32_t)indexCount;
-            geometry->numVertices = (uint32_t)positions->count;
+            //geometry->numVertices = (uint32_t)positions->count;
+            geometry->numVertices = (uint32_t)vertex_count;
             geometry->objectSpaceBounds = bounds;
+            geometry->geometryIndexInMesh = (uint32_t)prim_idx;
             switch (prim.type)
             {
                 case cgltf_primitive_type_triangles:
@@ -1613,10 +1765,16 @@ bool GltfImporter::Load(
             }
 
             minfo->objectSpaceBounds |= bounds;
+            minfo->totalMeshlets += geometry->numMeshlets;
+            minfo->totalMeshletVertices += geometry->numMeshletVertices;
+            minfo->totalMeshletTriangles += geometry->numMeshletTriangles;
             minfo->totalIndices += geometry->numIndices;
             minfo->totalVertices += geometry->numVertices;
             minfo->geometries.push_back(geometry);
 
+            totalMeshlets += geometry->numMeshlets;
+            totalMeshletVertices += geometry->numMeshletVertices;
+            totalMeshletTriangles += geometry->numMeshletTriangles;
             totalIndices += geometry->numIndices;
             totalVertices += geometry->numVertices;
         }
